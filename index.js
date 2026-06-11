@@ -3,10 +3,12 @@ const morgan = require('morgan')
 const cors = require('cors')
 
 const app = express()
+const path = require('path')
+app.use(express.static(path.join(__dirname, 'dist')))
+
 app.use(cors()) // se habilita el middleware cors para permitir solicitudes desde cualquier origen
 app.use(morgan('tiny'))
-app.use(express.json())
-app.use(express.static('dist')) // se habilita el middleware express.static para servir los archivos estáticos de la carpeta build, que es donde se encuentra la aplicación frontend después de ser construida
+app.use(express.json()) // se habilita el middleware express.json para parsear el cuerpo de las solicitudes JSON    
 
 
 let notes = [
