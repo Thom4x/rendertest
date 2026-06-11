@@ -40,9 +40,9 @@ app.get('/api/notes/:id', (req, res) => {// esto es un endpoint dinámico, el :i
     const note = notes.find(note => note.id === id) // se busca la nota con el id que se ha pasado como parámetro
 
     if (note) {
-        response.json(note) // si se encuentra la nota, se devuelve como respuesta
+        res.json(note) // si se encuentra la nota, se devuelve como respuesta
     } else {
-        response.status(404).end()
+        res.status(404).end()
     }
 })
 
