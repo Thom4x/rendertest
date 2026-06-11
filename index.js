@@ -6,6 +6,8 @@ const app = express()
 app.use(cors()) // se habilita el middleware cors para permitir solicitudes desde cualquier origen
 app.use(morgan('tiny'))
 app.use(express.json())
+app.use(express.static('dist')) // se habilita el middleware express.static para servir los archivos estáticos de la carpeta build, que es donde se encuentra la aplicación frontend después de ser construida
+
 
 let notes = [
     {
@@ -85,6 +87,12 @@ app.post('/api/notes', (request, response) => {
 
     response.json(note)
 })
+
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint) // se habilita el middleware para manejar las rutas desconocidas, debe ir al final de todas las rutas
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT)
