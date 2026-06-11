@@ -1,117 +1,92 @@
 const express = require('express')
 const morgan = require('morgan')
-const logger = require('./middlewares/loger')
 const cors = require('cors')
+
 const app = express()
 app.use(cors()) // se habilita el middleware cors para permitir solicitudes desde cualquier origen
+app.use(morgan('tiny'))
 app.use(express.json())
 
-morgan.token('body', (req) => {
-    return JSON.stringify(req.body) // se convierte el cuerpo de la petición a una cadena JSON para que se pueda mostrar en los logs
-})
-
-app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body')) // se configura morgan para que muestre el método, la URL, el estado, el tamaño de la respuesta, el tiempo de respuesta y el cuerpo de la petición en los logs
-
-//app.use(logger)
-
-
-let phoneBook = [
+let notes = [
     {
         id: 1,
-        name: "Arto Hellas",
-        number: "040-123456"
+        content: "HTML is easy",
+        important: true
     },
     {
         id: 2,
-        name: "Ada Lovelace",
-        number: "39-44-5323523"
+        content: "Browser can execute only JavaScript",
+        important: false
     },
     {
         id: 3,
-        name: "Dan Abramov",
-        number: "12-43-234345"
-    },
-    {
-        id: 4,
-        name: "Mary Poppendieck",
-        number: "39-23-6423122"
+        content: "GET and POST are the most important methods of HTTP protocol",
+        important: true
     }
 ]
 
 
-
-app.get('/api/persons', (request, response) => {
-    response.json(phoneBook)
+app.get('/', (request, response) => {
+    response.send('<h1>Hello World!</h1>')
 })
 
-app.get('/info', (request, response) => {
-    const getDate = new Date()
-    const formatoDate = getDate.toString();
-    response.send(`Phonebook has info for ${phoneBook.length} people<br>${formatoDate}`);
+app.get('/api/notes/hola', (request, response) => {
+    response.json(notes)
 })
 
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const person = phoneBook.find(userid => userid.id === id)
+app.get('/api/notes/:id', (req, res) => {// esto es un endpoint dinámico, el :id es un parámetro que se puede acceder a través de request.params.id
+    const id = Number(req.params.id) // el id es un string,  por lo que hay que convertirlo a número para compararlo con los id de las notas
+    console.log(id);
+    const note = notes.find(note => note.id === id) // se busca la nota con el id que se ha pasado como parámetro
 
-    if (person) {
-        response.json(person)
+    if (note) {
+        response.json(note) // si se encuentra la nota, se devuelve como respuesta
     } else {
-        response.status(404).json({ error: "Missing.." })
+        response.status(404).end()
     }
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const initialLength = phoneBook.length
+app.delete('/api/notes/:id', (request, response) => {
+    const id = Number(request.params.id) // el id es un string,  por lo que hay que convertirlo a número para compararlo con los id de las notas
+    notes = notes.filter(note => note.id !== id) // se filtran las notas para eliminar la nota con el id que se ha pasado como parámetro
+    response.status(202).end()
+})
 
-    phoneBook = phoneBook.filter(usr => usr.id !== id)
-
-    if (phoneBook.length !== initialLength) {
-        response.status(202).end()
-    } else {
-        response.status(404).json({ error: "ID Not found.." })
-    }
+app.post('/api/test', (request, response) => {
+    const note = request.body // se obtiene el cuerpo de la petición, que es un objeto con las propiedades content e important
+    console.log(request.headers);
+    console.log(note);
+    response.json(note) // se devuelve la nota como respuesta
 })
 
 const generateId = () => {
-    const random = Math.floor(Math.random() * 1001);
-    return random
+    const maxId = notes.length > 0
+        ? Math.max(...notes.map(n => n.id))
+        : 0
+    return maxId + 1
 }
 
-
-app.post('/api/persons', (request, response) => {
+app.post('/api/notes', (request, response) => {
     const body = request.body
 
-    if (!body.name || !body.number) {
+    if (!body.content) { // si el cuerpo de la petición no tiene la propiedad content, se devuelve un error 400 con un mensaje de error
         return response.status(400).json({
             error: 'content missing'
         })
     }
 
-    const newObject = {
+    const note = {
+        content: body.content,
+        important: Boolean(body.important) || false,
         id: generateId(),
-        name: body.name,
-        number: body.number
     }
 
-    if (phoneBook.find(usr => usr.name === newObject.name)) {
-        return response.status(400).json({
-            error: 'This person is already added'
-        })
-    }
-    phoneBook = phoneBook.concat(newObject)
-    response.json(newObject)
+    notes = notes.concat(note)
 
+    response.json(note)
 })
-
-const unknownEndpoint = (request, response) => {
-    response.status(404).send({ error: 'unknown endpoint' })
-}
-
-app.use(unknownEndpoint)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT)
-console.log("Server running in", PORT);
+console.log(`Server running on port ${PORT}`)
 
