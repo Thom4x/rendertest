@@ -1,102 +1,121 @@
+require('dotenv').config()
 const express = require('express')
-const morgan = require('morgan')
-const cors = require('cors')
+const Note = require('./models/note')
 
 const app = express()
-const path = require('path')
-app.use(express.static(path.join(__dirname, 'dist')))
 
-app.use(cors()) // se habilita el middleware cors para permitir solicitudes desde cualquier origen
-app.use(morgan('tiny'))
-app.use(express.json()) // se habilita el middleware express.json para parsear el cuerpo de las solicitudes JSON    
+let notes = []
 
+const requestLogger = (request, response, next) => {
+    console.log('Method:', request.method)
+    console.log('Path:  ', request.path)
+    console.log('Body:  ', request.body)
+    console.log('---')
+    next()
+}
 
-let notes = [
-    {
-        id: 1,
-        content: "HTML is easy",
-        important: true
-    },
-    {
-        id: 2,
-        content: "Browser can execute only JavaScript",
-        important: false
-    },
-    {
-        id: 3,
-        content: "GET and POST are the most important methods of HTTP protocol",
-        important: true
-    }
-]
-
+app.use(requestLogger)
+app.use(express.static('dist'))
+app.use(express.json())
 
 app.get('/', (request, response) => {
     response.send('<h1>Hello World!</h1>')
 })
 
-app.get('/api/notes/hola', (request, response) => {
-    response.json(notes)
+app.get('/api/notes', (request, response) => {
+    Note.find({}).then((notes) => {
+        console.log("Notas encontradas:", notes);
+        response.json(notes)
+    }).catch((error) => {
+        console.error("Error al obtener las notas:", error);
+        next(error) // Pasa el error al manejador de errores
+    })
 })
 
-app.get('/api/notes/:id', (req, res) => {// esto es un endpoint dinámico, el :id es un parámetro que se puede acceder a través de request.params.id
-    const id = Number(req.params.id) // el id es un string,  por lo que hay que convertirlo a número para compararlo con los id de las notas
-    console.log(id);
-    const note = notes.find(note => note.id === id) // se busca la nota con el id que se ha pasado como parámetro
+app.get('/api/notes/:id', (request, response, next) => {
+    Note.findById(request.params.id)
+        .then((note) => {
+            if (note) {
+                response.json(note)
+            } else {
+                response.status(404).end()
+            }
+        }).catch(error => {
+            next(error)
+        })
+})
 
-    if (note) {
-        res.json(note) // si se encuentra la nota, se devuelve como respuesta
-    } else {
-        res.status(404).end()
+app.post('/api/notes', (request, response, next) => {
+    const body = request.body
+
+    if (body.content === undefined) {
+        return response.status(400).json({ error: 'content missing' })
     }
+
+    const note = new Note({
+        content: body.content,
+        important: body.important || false,
+    })
+
+    note.save()
+        .then((savedNote) => {
+            response.json(savedNote)
+        }).catch((error) => {
+            next(error)
+        })
 })
 
 app.delete('/api/notes/:id', (request, response) => {
-    const id = Number(request.params.id) // el id es un string,  por lo que hay que convertirlo a número para compararlo con los id de las notas
-    notes = notes.filter(note => note.id !== id) // se filtran las notas para eliminar la nota con el id que se ha pasado como parámetro
-    response.status(202).end()
-})
-
-app.post('/api/test', (request, response) => {
-    const note = request.body // se obtiene el cuerpo de la petición, que es un objeto con las propiedades content e important
-    console.log(request.headers);
-    console.log(note);
-    response.json(note) // se devuelve la nota como respuesta
-})
-
-const generateId = () => {
-    const maxId = notes.length > 0
-        ? Math.max(...notes.map(n => n.id))
-        : 0
-    return maxId + 1
-}
-
-app.post('/api/notes', (request, response) => {
-    const body = request.body
-
-    if (!body.content) { // si el cuerpo de la petición no tiene la propiedad content, se devuelve un error 400 con un mensaje de error
-        return response.status(400).json({
-            error: 'content missing'
+    //const id = request.params.id
+    //notes = notes.filter((note) => note.id !== id)
+    //response.status(204).end()
+    Note.findByIdAndDelete(request.params.id)
+        .then(result => {
+            response.status(204).end()
         })
-    }
-
-    const note = {
-        content: body.content,
-        important: Boolean(body.important) || false,
-        id: generateId(),
-    }
-
-    notes = notes.concat(note)
-
-    response.json(note)
+        .catch(error => next(error))
 })
 
+app.put('/api/notes/:id', (request, response, next) => {
+    //const body = request.body
+    const { content, important } = request.body
+
+    Note.findByIdAndUpdate(
+        request.params.id,
+        { content, important },
+        { new: true, runValidators: true, context: 'query' })
+
+        .then(updatedNote => {
+            response.json(updatedNote)
+        })
+        .catch(error => next(error))
+})
+
+// Middleware para manejar rutas desconocidas
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' })
 }
 
-app.use(unknownEndpoint) // se habilita el middleware para manejar las rutas desconocidas, debe ir al final de todas las rutas
+app.use(unknownEndpoint)
 
-const PORT = process.env.PORT || 3001
-app.listen(PORT)
-console.log(`Server running on port ${PORT}`)
+// Middleware para manejar solicitudes que resulten en errores
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
 
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    }
+    if (error.name === 'ValidationError') {
+        return response.status(400).json({ error: error.message })
+    }
+
+    next(error)
+}
+
+// este debe ser el último middleware cargado, ¡también todas las rutas deben ser registrada antes que esto!
+app.use(errorHandler)
+
+const PORT = process.env.PORT
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`)
+})
