@@ -4,7 +4,6 @@ const Note = require('./Models/note.js')
 
 const app = express()
 
-let notes = []
 
 const requestLogger = (request, response, next) => {
     console.log('Method:', request.method)
