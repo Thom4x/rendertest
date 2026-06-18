@@ -22,7 +22,7 @@ app.get('/', (request, response) => {
 })
 
 app.get('/api/notes', (request, response) => {
-    Note.find({}).then((notes) => {
+    Note.find().then(notes => {
         console.log("Notas encontradas:", notes);
         response.json(notes)
     }).catch((error) => {
