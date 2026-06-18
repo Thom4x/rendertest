@@ -32,4 +32,5 @@ noteSchema.set('toJSON', {
     },
 })
 
+// Este modelo se exporta para ser utilizado en otros archivos, como index.js
 module.exports = mongoose.model('Note', noteSchema)
