@@ -21,7 +21,7 @@ app.get('/', (request, response) => {
     response.send('<h1>Hello World!</h1>')
 })
 
-app.get('/api/notes', (request, response) => {
+app.get('/api/notes', (request, response, next) => {
     Note.find().then(notes => {
         console.log("Notas encontradas:", notes);
         response.json(notes)
@@ -64,12 +64,12 @@ app.post('/api/notes', (request, response, next) => {
         })
 })
 
-app.delete('/api/notes/:id', (request, response) => {
+app.delete('/api/notes/:id', (request, response, next) => {
     //const id = request.params.id
     //notes = notes.filter((note) => note.id !== id)
     //response.status(204).end()
     Note.findByIdAndDelete(request.params.id)
-        .then(result => {
+        .then(() => {
             response.status(204).end()
         })
         .catch(error => next(error))
